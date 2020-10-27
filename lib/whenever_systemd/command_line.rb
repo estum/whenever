@@ -57,14 +57,14 @@ module WheneverSystemd
 
     def update_units
       script_path = make_script("update_units") { job_list.generate_update_script(@options[:install_path]) }
-      pid = spawn(sudo_if_need(script_path))
-      Process.wait pid
+      cmd = @options[:custom_script] ? binding.eval(Pathname(@options[:custom_script]).read) : sudo_if_need(script_path)
+      system(cmd)
     end
 
     def clear_units
       script_path = make_script("clear_units") { job_list.generate_clear_script(@options[:install_path]) }
-      pid = spawn(sudo_if_need(script_path))
-      Process.wait pid
+      cmd = @options[:custom_script] ? binding.eval(Pathname(@options[:custom_script]).read) : sudo_if_need(script_path)
+      system(cmd)
     end
 
     def job_list

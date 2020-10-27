@@ -59,7 +59,11 @@ module WheneverSystemd
       @options, @options_was = @options_was, nil
     end
 
-    %w(minutely hourly daily monthly yearly quarterly semiannually).each do |k|
+    def daily(at: "00:00:00", **options, &block)
+      every("*-*-*", at: at, **options, &block)
+    end
+
+    %w(minutely hourly monthly yearly quarterly semiannually).each do |k|
       class_eval <<~RUBY, __FILE__, __LINE__ + 1
         def #{k}(**options, &block)
           every(:#{k}, **options, &block)
@@ -105,12 +109,11 @@ module WheneverSystemd
       [
         make_backup_dir,
         backup_previous_units_from(path, all: true),
-        stop_timers(all: true),
-        disable_timers(all: true),
+        systemctl_timers('disable', '--now', all: true),
         generate_units_script(@temp_path),
         copy_updated_units_to(path),
-        Shellwords.join(["systemctl", "daemon-reload"]),
-        format(%(systemctl enable --now %s), units_expansion('timer'))
+        Shellwords.join(["/usr/bin/systemctl", "daemon-reload"]),
+        systemctl_timers('enable', '--now')
       ].join("\n\n")
     end
 
@@ -118,14 +121,13 @@ module WheneverSystemd
       [
         make_backup_dir,
         backup_previous_units_from(path, all: true),
-        stop_timers(all: true),
-        disable_timers(all: true),
-        format(%(rm -rfI %{target}/%{expansion}), target: Shellwords.escape(path), expansion: units_expansion(all: true))
+        systemctl_timers('disable', '--now', all: true),
+        format(%(/usr/bin/rm -rfI %{target}/%{expansion}), target: Shellwords.escape(path), expansion: units_expansion(all: true))
       ].join("\n\n")
     end
 
     def backup_previous_units_from(path, **opts)
-      format(%(cp -bfruv %{source}/%{expansion} %{target}),
+      format(%(/usr/bin/cp -rvf %{source}/%{expansion} -t %{target}),
         source: Shellwords.escape(path),
         expansion: units_expansion(**opts),
         target: Shellwords.escape("#{@temp_path}/backup")
@@ -133,7 +135,7 @@ module WheneverSystemd
     end
 
     def copy_updated_units_to(path)
-      format(%(cp -bfruv %{source}/*.{service,timer} %{target}/),
+      format(%(/usr/bin/cp -rvf %{source}/*.{service,timer} -t %{target}),
         source: Shellwords.escape(@temp_path),
         target: Shellwords.escape(path)
       )
@@ -143,12 +145,16 @@ module WheneverSystemd
       Shellwords.join(["mkdir", "-p", "#{@temp_path}/backup"])
     end
 
-    def stop_timers(**opts)
-      format(%(systemctl stop %s), units_expansion('timer', **opts))
-    end
-
-    def disable_timers(**opts)
-      format(%(systemctl disable %s), units_expansion('timer', **opts))
+    def systemctl_timers(*args, **opts)
+      case args[0]
+      when "enable", "disable"
+        format(%(for timer in %s; do %s $timer; done),
+          units_expansion('timer', sub: true, **opts),
+          Shellwords.join(["/usr/bin/systemctl", *args])
+        )
+      else
+        Shellwords.join(["/usr/bin/systemctl", *args, units_expansion('timer', **opts)])
+      end
     end
 
     def timers
@@ -159,9 +165,15 @@ module WheneverSystemd
       Dir.glob("#{path}/#{units_expansion}")
     end
 
-    def units_expansion(ext = "{service,timer}", all: false)
+    def units_expansion(ext = "{service,timer}", all: false, sub: false)
       suffixes = all ? "*" : format("{%s}", @jobs.map { |j| Shellwords.escape(j.unprefixed_name) }.join(?,))
-      "#{@prefix}-#{suffixes}.#{ext}"
+      pattern = "#{@prefix}-#{suffixes}.#{ext}"
+      return pattern unless sub
+      if all
+        format(%($(/usr/bin/systemctl list-unit-files '%s' | /usr/bin/cut -d ' ' -f 1 | /usr/bin/head -n -2 | /usr/bin/tail -n +2)), pattern)
+      else
+        format(%($(/usr/bin/echo %s)), pattern)
+      end
     end
 
     def dry_units(path)

@@ -57,6 +57,10 @@ OptionParser.new do |opts|
     options[:sudo] = true
   end
 
+  opts.on("--script [script]", "Use custom script to perform action") do |v|
+    options[:custom_script] = File.expand_path(v)
+  end
+
   opts.on('-v', '--version') { puts "WheneverSystemd v#{WheneverSystemd::VERSION}"; exit(0) }
 end.parse!
 
