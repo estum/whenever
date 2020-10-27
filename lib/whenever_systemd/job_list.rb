@@ -101,10 +101,33 @@ module WheneverSystemd
       Formatters::MaterializeUnits[systemd_units(path)]
     end
 
-    def backup_previous_units_from(path)
+    def generate_update_script(path)
+      [
+        make_backup_dir,
+        backup_previous_units_from(path, all: true),
+        stop_timers(all: true),
+        disable_timers(all: true),
+        generate_units_script(@temp_path),
+        copy_updated_units_to(path),
+        Shellwords.join(["systemctl", "daemon-reload"]),
+        format(%(systemctl enable --now %s), units_expansion('timer'))
+      ].join("\n\n")
+    end
+
+    def generate_clear_script(path)
+      [
+        make_backup_dir,
+        backup_previous_units_from(path, all: true),
+        stop_timers(all: true),
+        disable_timers(all: true),
+        format(%(rm -rfI %{target}/%{expansion}), target: Shellwords.escape(path), expansion: units_expansion(all: true))
+      ].join("\n\n")
+    end
+
+    def backup_previous_units_from(path, **opts)
       format(%(cp -bfruv %{source}/%{expansion} %{target}),
         source: Shellwords.escape(path),
-        expansion: units_expansion,
+        expansion: units_expansion(**opts),
         target: Shellwords.escape("#{@temp_path}/backup")
       )
     end
@@ -116,24 +139,16 @@ module WheneverSystemd
       )
     end
 
-    def generate_update_script(path)
-      [
-        Shellwords.join(["mkdir", "-p", "#{@temp_path}/backup"]),
-        backup_previous_units_from(path),
-        generate_units_script(@temp_path),
-        copy_updated_units_to(path),
-        Shellwords.join(["systemctl", "daemon-reload"]),
-        format(%(systemctl enable --now %s), units_expansion('timer'))
-      ].join("\n\n")
+    def make_backup_dir
+      Shellwords.join(["mkdir", "-p", "#{@temp_path}/backup"])
     end
 
-    def generate_clear_script(path)
-      [
-        backup_previous_units_from(path),
-        format(%(systemctl stop %s), units_expansion('timer')),
-        format(%(systemctl disable %s), units_expansion('timer')),
-        format(%(rm -rfI %{target}/%{expansion}), target: Shellwords.escape(path), expansion: units_expansion)
-      ].join("\n\n")
+    def stop_timers(**opts)
+      format(%(systemctl stop %s), units_expansion('timer', **opts))
+    end
+
+    def disable_timers(**opts)
+      format(%(systemctl disable %s), units_expansion('timer', **opts))
     end
 
     def timers
@@ -144,8 +159,9 @@ module WheneverSystemd
       Dir.glob("#{path}/#{units_expansion}")
     end
 
-    def units_expansion(ext = "{service,timer}")
-      "#{@prefix}-{#{@jobs.map { |j| Shellwords.escape(j.unprefixed_name) }.join(?,)}}.#{ext}"
+    def units_expansion(ext = "{service,timer}", all: false)
+      suffixes = all ? "*" : format("{%s}", @jobs.map { |j| Shellwords.escape(j.unprefixed_name) }.join(?,))
+      "#{@prefix}-#{suffixes}.#{ext}"
     end
 
     def dry_units(path)
