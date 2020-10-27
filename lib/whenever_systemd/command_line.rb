@@ -78,8 +78,8 @@ module WheneverSystemd
     end
 
     def make_script(name)
-      FileUtils.mkdir_p(@temp_path)
-      script_file = Pathname(@temp_path)/"#{name}.sh"
+      FileUtils.mkdir_p(@options[:temp_path])
+      script_file = Pathname(@options[:temp_path])/"#{name}.sh"
       script_file.write(yield)
       script_file.chmod(0755)
       script_file.to_path
