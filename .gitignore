@@ -4,3 +4,4 @@ doc
 .*.sw[a-z]
 Gemfile.lock
 gemfiles/*.lock
+.ruby-version

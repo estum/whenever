@@ -1,10 +1,10 @@
-module Whenever
+module WheneverSystemd
   module Output
     class Redirection
       def initialize(output)
         @output = output
       end
-      
+
       def to_s
         return '' unless defined?(@output)
         case @output
@@ -13,11 +13,11 @@ module Whenever
           when NilClass then ">> /dev/null 2>&1"
           when Proc     then @output.call
           else ''
-        end 
+        end
       end
-      
+
     protected
-      
+
       def stdout
         return unless @output.has_key?(:standard)
         @output[:standard].nil? ? '/dev/null' : @output[:standard]
