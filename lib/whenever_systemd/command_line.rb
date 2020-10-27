@@ -74,7 +74,7 @@ module WheneverSystemd
     private
 
     def sudo_if_need(*cmd)
-      @options[:sudo] ? ["sudo", "bash", *cmd] : ["bash", cmd]
+      Shellwords.join(@options[:sudo] ? ["sudo", "bash", *cmd] : ["bash", *cmd])
     end
 
     def make_script(name)

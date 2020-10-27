@@ -26,6 +26,10 @@ module WheneverSystemd
     IntervalHours   = factory["0/%{hours}:0/%{minutes}"] >> proc { |v| v.chomp("/0") }
     IntervalSeconds = factory["0:0:0/%d"]
 
+    NormalizeInterval = {
+      "daily" => "*-*-*"
+    }
+
     Duration = -> (freq) do
       case freq
       when 0...3600;     IntervalMinutes[freq.parts]  # 1 second to hour

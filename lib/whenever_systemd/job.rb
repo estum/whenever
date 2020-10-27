@@ -22,7 +22,7 @@ module WheneverSystemd
       install = options.delete(:install) { { wanted_by: "timers.target" } }
 
       timer = options.delete(:timer).to_h
-      timer[:on_calendar] ||= [options.delete(:interval), @at].compact.join(" ")
+      timer[:on_calendar] ||= compose_on_calendar(options.delete(:interval), @at)
 
       unit = options.delete(:unit).to_h
       unit[:description] = description
@@ -33,6 +33,14 @@ module WheneverSystemd
 
       @service_options = { unit: unit, service: service }
       @timer_options = { unit: { description: description }, timer: timer, install: install }
+    end
+
+    def compose_on_calendar(*args)
+      args.compact!
+      if args.size > 1 && Formatters::NormalizeInterval.key?(args[0])
+        args[0] = Formatters::NormalizeInterval[args[0]]
+      end
+      args.join(" ")
     end
 
     def output
