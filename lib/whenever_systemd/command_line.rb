@@ -74,14 +74,14 @@ module WheneverSystemd
     private
 
     def sudo_if_need(*cmd)
-      @options[:sudo] ? ["sudo", *cmd] : cmd
+      @options[:sudo] ? ["sudo", "bash", *cmd] : ["bash", cmd]
     end
 
     def make_script(name)
       FileUtils.mkdir_p(@options[:temp_path])
       script_file = Pathname(@options[:temp_path])/"#{name}.sh"
       script_file.write(yield)
-      script_file.chmod(0755)
+      # script_file.chmod(0755)
       script_file.to_path
     end
 
