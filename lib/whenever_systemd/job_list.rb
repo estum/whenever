@@ -96,7 +96,7 @@ module WheneverSystemd
           options[:description] ||= options.delete("?") { "WheneverSystemd-generated Job" }
 
           @jobs ||= []
-          @jobs << Job.new("#{@prefix}-#{job_name}", @options.merge(@set_variables).merge(options).deep_dup)
+          @jobs << Job.new("#{@prefix}-#{job_name}", @set_variables.deep_merge(@options).deep_merge(options).deep_dup)
         end
       end
     end
